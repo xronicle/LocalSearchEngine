@@ -32,7 +32,6 @@ public class Main {
                     });
 
             System.out.println("Индексация завершена. Уникальных слов: " + engine.getSize());
-
             Scanner scanner = new Scanner(System.in);
             while (true) {
                 System.out.print("\nВведите слово для поиска (или 'выход' для завершения): ");
@@ -43,15 +42,15 @@ public class Main {
                     break;
                 }
 
-                Map<String, Integer> foundIn = engine.search(query);
+                Map<String, Double> foundIn = engine.searchTfIdf(query);
 
                 if (!foundIn.isEmpty()) {
-                    System.out.println("Результаты поиска (по релевантности):");
+                    System.out.println("Результаты поиска (по TF-IDF релевантности):");
 
                     foundIn.entrySet().stream()
                             .sorted((e1, e2) -> e2.getValue().compareTo(e1.getValue()))
                             .forEach(entry -> {
-                                System.out.println(entry.getKey() + " (совпадений: " + entry.getValue() + ")");
+                                System.out.printf("%s (Вес TF-IDF: %.4f)\n", entry.getKey(), entry.getValue());
                             });
                 } else {
                     System.out.println("Слово не найдено.");
