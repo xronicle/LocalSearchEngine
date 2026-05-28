@@ -15,11 +15,15 @@ public class Main {
 
         try (Stream<Path> paths = Files.list(folderPath)) {
             paths.filter(Files::isRegularFile)
-                    .filter(p -> p.toString().endsWith(".txt"))
+                    .filter(p -> {
+                        String name = p.toString().toLowerCase();
+                        return name.endsWith(".txt") || name.endsWith(".pdf") || name.endsWith(".docx");
+                    })
                     .forEach(filePath -> {
                         String fileName = filePath.getFileName().toString();
                         try {
-                            String content = Files.readString(filePath);
+                            String content = FileParser.extractText(filePath);
+
                             content = content.toLowerCase().replaceAll("[^a-zа-яё0-9\\s]", "");
                             String[] words = content.split("\\s+");
 
