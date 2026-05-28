@@ -1,6 +1,7 @@
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.HashMap;
 import java.util.Map;
 import java.util.Scanner;
 import java.util.stream.Stream;
@@ -38,7 +39,7 @@ public class Main {
             System.out.println("Индексация завершена. Уникальных слов: " + engine.getSize());
             Scanner scanner = new Scanner(System.in);
             while (true) {
-                System.out.print("\nВведите слово для поиска (или 'выход' для завершения): ");
+                System.out.print("\nВведите запрос (или 'выход' для завершения): ");
                 String query = scanner.nextLine().toLowerCase().trim();
 
                 if (query.equals("выход")) {
@@ -46,18 +47,33 @@ public class Main {
                     break;
                 }
 
-                Map<String, Double> foundIn = engine.searchTfIdf(query);
+                String[] queryWords = query.split("\\s+");
 
-                if (!foundIn.isEmpty()) {
-                    System.out.println("Результаты поиска (по TF-IDF релевантности):");
+                Map<String, Double> combinedResults = new HashMap<>();
 
-                    foundIn.entrySet().stream()
+                for (String qWord : queryWords) {
+                    if (qWord.isEmpty()) continue;
+
+                    Map<String, Double> wordResults = engine.searchTfIdf(qWord);
+
+                    for (Map.Entry<String, Double> entry : wordResults.entrySet()) {
+                        String docName = entry.getKey();
+                        double score = entry.getValue();
+
+                        combinedResults.put(docName, combinedResults.getOrDefault(docName, 0.0) + score);
+                    }
+                }
+
+                if (!combinedResults.isEmpty()) {
+                    System.out.println("Результаты поиска (по суммарной TF-IDF релевантности):");
+
+                    combinedResults.entrySet().stream()
                             .sorted((e1, e2) -> e2.getValue().compareTo(e1.getValue()))
                             .forEach(entry -> {
-                                System.out.printf("%s (Вес TF-IDF: %.4f)\n", entry.getKey(), entry.getValue());
+                                System.out.printf("%s (Суммарный вес: %.4f)\n", entry.getKey(), entry.getValue());
                             });
                 } else {
-                    System.out.println("Слово не найдено.");
+                    System.out.println("По вашему запросу ничего не найдено.");
                 }
             }
 
