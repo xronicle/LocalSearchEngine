@@ -67,4 +67,20 @@ public class InvertedIndex {
             return gson.fromJson(reader, InvertedIndex.class);
         }
     }
+
+    public Map<String, Integer> getWordFrequencies(String word) {
+        return index.getOrDefault(word, new java.util.HashMap<>());
+    }
+
+    public String getRootFolderPath() {
+        if (indexedDocuments == null || indexedDocuments.isEmpty()) {
+            return "База пуста";
+        }
+        String firstPath = indexedDocuments.iterator().next();
+        try {
+            return java.nio.file.Paths.get(firstPath).getParent().toString();
+        } catch (Exception e) {
+            return "Неизвестная директория";
+        }
+    }
 }

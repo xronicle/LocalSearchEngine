@@ -1,3 +1,6 @@
+import com.formdev.flatlaf.FlatDarkLaf;
+import com.formdev.flatlaf.FlatLightLaf;
+
 import javax.swing.*;
 import javax.swing.table.DefaultTableModel;
 import java.awt.*;
@@ -16,67 +19,119 @@ public class SearchEngineGUI extends JFrame {
     private JTextField searchField;
     private JTable resultTable;
     private DefaultTableModel tableModel;
-    private JComboBox<String> sortBox;
+    private JLabel currentFolderLabel;
     private InvertedIndex engine;
+    private boolean isDarkMode = true;
     private final String INDEX_FILE = "index.json";
 
     public SearchEngineGUI() {
         engine = new InvertedIndex();
-        loadDatabaseIfExists();
 
         setTitle("Локальная Поисковая Система");
-        setSize(800, 600);
+        setSize(850, 600);
         setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
         setLocationRelativeTo(null);
 
-        JPanel topPanel = new JPanel(new BorderLayout(10, 10));
-        topPanel.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
+        JPanel topPanel = new JPanel(new BorderLayout(0, 10));
+        topPanel.setBorder(BorderFactory.createEmptyBorder(15, 15, 15, 15));
 
+        JPanel topStatusPanel = new JPanel(new BorderLayout());
+        currentFolderLabel = new JLabel("Текущая база: загрузка...");
+        currentFolderLabel.setForeground(Color.GRAY);
+        topStatusPanel.add(currentFolderLabel, BorderLayout.WEST);
+
+        JPanel iconPanel = new JPanel(new FlowLayout(FlowLayout.RIGHT, 5, 0));
+        JButton themeButton = new JButton();
+        themeButton.setToolTipText("Сменить тему (Светлая/Темная)");
+        themeButton.setFocusable(false);
+
+        JButton helpButton = new JButton();
+        helpButton.setToolTipText("Справка о программе");
+        helpButton.setFocusable(false);
+
+        Icon sunIcon = createSunIcon();
+        Icon moonIcon = createMoonIcon();
+        Icon helpIcon = createHelpIcon();
+
+        themeButton.setIcon(sunIcon);
+        helpButton.setIcon(helpIcon);
+
+        iconPanel.add(themeButton);
+        iconPanel.add(helpButton);
+        topStatusPanel.add(iconPanel, BorderLayout.EAST);
+
+        JPanel searchPanel = new JPanel(new BorderLayout(10, 0));
         searchField = new JTextField();
         searchField.setFont(new Font("SansSerif", Font.PLAIN, 16));
+        searchField.putClientProperty("JTextField.placeholderText", "Введите запрос для поиска...");
 
-        JPanel buttonPanel = new JPanel(new GridLayout(1, 2, 5, 0));
+        JPanel mainButtonPanel = new JPanel(new GridLayout(1, 2, 8, 0));
         JButton searchButton = new JButton("Найти");
-        JButton chooseFolderButton = new JButton("Выбрать папку");
-        buttonPanel.add(searchButton);
-        buttonPanel.add(chooseFolderButton);
+        JButton chooseFolderButton = new JButton("Обновить базу");
+        mainButtonPanel.add(searchButton);
+        mainButtonPanel.add(chooseFolderButton);
 
-        JPanel sortPanel = new JPanel(new FlowLayout(FlowLayout.LEFT));
-        sortPanel.add(new JLabel("Сортировка: "));
-        sortBox = new JComboBox<>(new String[]{"По релевантности (TF-IDF)", "По имени файла (А-Я)"});
-        sortPanel.add(sortBox);
+        searchPanel.add(searchField, BorderLayout.CENTER);
+        searchPanel.add(mainButtonPanel, BorderLayout.EAST);
 
-        JPanel headerPanel = new JPanel(new BorderLayout());
-        headerPanel.add(searchField, BorderLayout.CENTER);
-        headerPanel.add(buttonPanel, BorderLayout.EAST);
-        headerPanel.add(sortPanel, BorderLayout.SOUTH);
+        topPanel.add(topStatusPanel, BorderLayout.NORTH);
+        topPanel.add(searchPanel, BorderLayout.CENTER);
 
-        topPanel.add(headerPanel, BorderLayout.CENTER);
+        loadDatabaseIfExists();
 
-        tableModel = new DefaultTableModel(new String[]{"Документ", "Вес (TF-IDF)", "Скрытый путь"}, 0) {
+        tableModel = new DefaultTableModel(new String[]{"Документ", "Совпадений", "Вес (TF-IDF)", "Скрытый путь"}, 0) {
             @Override
             public boolean isCellEditable(int row, int column) {
                 return false;
             }
+            @Override
+            public Class<?> getColumnClass(int columnIndex) {
+                if (columnIndex == 1) return Integer.class;
+                if (columnIndex == 2) return Double.class;
+                return String.class;
+            }
         };
+
         resultTable = new JTable(tableModel);
         resultTable.setFont(new Font("SansSerif", Font.PLAIN, 14));
-        resultTable.setRowHeight(25);
+        resultTable.setRowHeight(28);
         resultTable.getTableHeader().setFont(new Font("SansSerif", Font.BOLD, 14));
+        resultTable.setAutoCreateRowSorter(true);
 
-        resultTable.getColumnModel().getColumn(2).setMinWidth(0);
-        resultTable.getColumnModel().getColumn(2).setMaxWidth(0);
-        resultTable.getColumnModel().getColumn(2).setWidth(0);
+        resultTable.getColumnModel().getColumn(0).setPreferredWidth(500);
+        resultTable.getColumnModel().getColumn(1).setPreferredWidth(100);
+        resultTable.getColumnModel().getColumn(2).setPreferredWidth(120);
+
+        resultTable.getColumnModel().getColumn(3).setMinWidth(0);
+        resultTable.getColumnModel().getColumn(3).setMaxWidth(0);
+        resultTable.getColumnModel().getColumn(3).setWidth(0);
 
         JScrollPane scrollPane = new JScrollPane(resultTable);
+        scrollPane.setBorder(BorderFactory.createEmptyBorder(0, 15, 15, 15));
 
         add(topPanel, BorderLayout.NORTH);
         add(scrollPane, BorderLayout.CENTER);
 
         searchButton.addActionListener(e -> performSearch());
         searchField.addActionListener(e -> performSearch());
-        sortBox.addActionListener(e -> performSearch()); // Пересортировка при смене
         chooseFolderButton.addActionListener(e -> selectFolderAndIndex());
+        helpButton.addActionListener(e -> showHelpDialog());
+
+        themeButton.addActionListener(e -> {
+            isDarkMode = !isDarkMode;
+            try {
+                if (isDarkMode) {
+                    UIManager.setLookAndFeel(new FlatDarkLaf());
+                    themeButton.setIcon(sunIcon);
+                } else {
+                    UIManager.setLookAndFeel(new FlatLightLaf());
+                    themeButton.setIcon(moonIcon);
+                }
+                SwingUtilities.updateComponentTreeUI(this);
+            } catch (Exception ex) {
+                ex.printStackTrace();
+            }
+        });
 
         resultTable.addMouseListener(new MouseAdapter() {
             public void mouseClicked(MouseEvent me) {
@@ -91,7 +146,12 @@ public class SearchEngineGUI extends JFrame {
         if (Files.exists(Paths.get(INDEX_FILE))) {
             try {
                 engine = InvertedIndex.loadFromFile(INDEX_FILE);
-            } catch (Exception ignored) {}
+                currentFolderLabel.setText("Текущая база: " + engine.getRootFolderPath());
+            } catch (Exception ignored) {
+                currentFolderLabel.setText("Текущая база: Ошибка чтения кэша");
+            }
+        } else {
+            currentFolderLabel.setText("Текущая база: Не выбрана");
         }
     }
 
@@ -102,9 +162,10 @@ public class SearchEngineGUI extends JFrame {
 
         if (chooser.showOpenDialog(this) == JFileChooser.APPROVE_OPTION) {
             File selectedFolder = chooser.getSelectedFile();
+            currentFolderLabel.setText("Текущая база: " + selectedFolder.getAbsolutePath());
 
             tableModel.setRowCount(0);
-            tableModel.addRow(new Object[]{"Индексация...", "Пожалуйста, подождите", ""});
+            tableModel.addRow(new Object[]{"Индексация...", 0, 0.0, ""});
 
             new Thread(() -> {
                 engine = new InvertedIndex();
@@ -120,7 +181,6 @@ public class SearchEngineGUI extends JFrame {
                                     content = content.toLowerCase().replaceAll("[^a-zа-яё0-9\\s]", "");
                                     String[] words = content.split("\\s+");
 
-                                    // ВАЖНО: Теперь сохраняем АБСОЛЮТНЫЙ путь к файлу
                                     String absolutePath = filePath.toAbsolutePath().toString();
                                     for (String word : words) {
                                         if (word.isEmpty()) continue;
@@ -151,53 +211,54 @@ public class SearchEngineGUI extends JFrame {
         if (query.isEmpty()) return;
 
         String[] queryWords = query.split("\\s+");
-        Map<String, Double> combinedResults = new java.util.HashMap<>();
+        Map<String, Double> combinedTfIdf = new java.util.HashMap<>();
+        Map<String, Integer> combinedFreq = new java.util.HashMap<>();
 
         for (String qWord : queryWords) {
             if (qWord.isEmpty()) continue;
             String stemmedQuery = RussianStemmer.stem(qWord);
-            Map<String, Double> wordResults = engine.searchTfIdf(stemmedQuery);
 
-            for (Map.Entry<String, Double> entry : wordResults.entrySet()) {
+            Map<String, Double> tfIdfResults = engine.searchTfIdf(stemmedQuery);
+            for (Map.Entry<String, Double> entry : tfIdfResults.entrySet()) {
                 String fullPath = entry.getKey();
-                double score = entry.getValue();
-                combinedResults.put(fullPath, combinedResults.getOrDefault(fullPath, 0.0) + score);
+                combinedTfIdf.put(fullPath, combinedTfIdf.getOrDefault(fullPath, 0.0) + entry.getValue());
+            }
+
+            Map<String, Integer> freqResults = engine.getWordFrequencies(stemmedQuery);
+            for (Map.Entry<String, Integer> entry : freqResults.entrySet()) {
+                String fullPath = entry.getKey();
+                combinedFreq.put(fullPath, combinedFreq.getOrDefault(fullPath, 0) + entry.getValue());
             }
         }
 
-
         tableModel.setRowCount(0);
 
-        if (combinedResults.isEmpty()) {
-            tableModel.addRow(new Object[]{"Ничего не найдено", "", ""});
+        if (combinedTfIdf.isEmpty()) {
+            tableModel.addRow(new Object[]{"Ничего не найдено", 0, 0.0, ""});
             return;
         }
 
-        List<Map.Entry<String, Double>> resultList = new ArrayList<>(combinedResults.entrySet());
+        List<String> resultPaths = new ArrayList<>(combinedTfIdf.keySet());
 
-        if (sortBox.getSelectedIndex() == 0) {
-            // По убыванию веса TF-IDF
-            resultList.sort((e1, e2) -> e2.getValue().compareTo(e1.getValue()));
-        } else {
-            resultList.sort((e1, e2) -> {
-                String name1 = Paths.get(e1.getKey()).getFileName().toString();
-                String name2 = Paths.get(e2.getKey()).getFileName().toString();
-                return name1.compareToIgnoreCase(name2);
-            });
-        }
-
-        for (Map.Entry<String, Double> entry : resultList) {
-            String fullPath = entry.getKey();
+        for (String fullPath : resultPaths) {
             String fileName = Paths.get(fullPath).getFileName().toString();
-            String formattedScore = String.format("%.4f", entry.getValue());
+            int freq = combinedFreq.getOrDefault(fullPath, 0);
+            double rawScore = combinedTfIdf.get(fullPath);
+            double formattedScore = Math.round(rawScore * 10000.0) / 10000.0;
 
-            tableModel.addRow(new Object[]{fileName, formattedScore, fullPath});
+            tableModel.addRow(new Object[]{fileName, freq, formattedScore, fullPath});
         }
+
+        resultTable.getRowSorter().toggleSortOrder(2);
+        resultTable.getRowSorter().toggleSortOrder(2);
     }
 
     private void openSelectedFile() {
         int row = resultTable.getSelectedRow();
-        String absolutePath = (String) tableModel.getValueAt(row, 2);
+        if (row == -1) return;
+
+        int modelRow = resultTable.convertRowIndexToModel(row);
+        String absolutePath = (String) tableModel.getValueAt(modelRow, 3);
 
         if (absolutePath.isEmpty()) return;
 
@@ -209,7 +270,108 @@ public class SearchEngineGUI extends JFrame {
                 JOptionPane.showMessageDialog(this, "Файл больше не существует по этому пути!", "Ошибка", JOptionPane.ERROR_MESSAGE);
             }
         } catch (Exception ex) {
-            JOptionPane.showMessageDialog(this, "Не удалось открыть файл. Проверьте права доступа.", "Ошибка", JOptionPane.ERROR_MESSAGE);
+            JOptionPane.showMessageDialog(this, "Не удалось открыть файл.", "Ошибка", JOptionPane.ERROR_MESSAGE);
         }
+    }
+
+    private void showHelpDialog() {
+        String helpText = "<html><body style='width: 450px; font-family: sans-serif;'>" +
+                "<h2 style='color: #4A90E2;'>Как работает этот поисковик?</h2>" +
+                "<p><b>1. Морфологический анализ (Стемминг)</b><br>" +
+                "Программа не ищет точные совпадения. Алгоритм Портера отсекает окончания и суффиксы. " +
+                "Запрос «электротехнику» превращается в корень «электротехник», поэтому поисковик " +
+                "понимает любые падежи в документах.</p>" +
+                "<p><b>2. Метрика релевантности TF-IDF</b><br>" +
+                "Ранжирование происходит по математической модели <i>Term Frequency - Inverse Document Frequency</i>.<br>" +
+                "Частые слова-паразиты (предлоги, союзы) автоматически получают нулевой вес. " +
+                "Редкие и узкоспециализированные термины получают высший балл, поднимая релевантные файлы в топ.</p>" +
+                "<p><b>3. Инвертированный индекс</b><br>" +
+                "Сырой текст из бинарных PDF и DOCX извлекается (Apache POI/PDFBox) и кэшируется в локальную базу данных (JSON). При поиске программа " +
+                "мгновенно находит результат в памяти, не перечитывая жесткий диск заново.</p>" +
+                "<br><p style='text-align: right; color: gray;'><i>Разработано: М.А. Коротков, TPU, 2026</i></p>" +
+                "</body></html>";
+
+        JOptionPane.showMessageDialog(this, helpText, "О технологии", JOptionPane.INFORMATION_MESSAGE);
+    }
+
+    private static Icon createSunIcon() {
+        return new Icon() {
+            @Override
+            public void paintIcon(Component c, Graphics g, int x, int y) {
+                Graphics2D g2 = (Graphics2D) g.create();
+                g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+                g2.setColor(c.getForeground());
+
+                int centerX = x + getIconWidth() / 2;
+                int centerY = y + getIconHeight() / 2;
+                int radius = 5;
+
+                g2.setStroke(new BasicStroke(1.5f));
+                g2.drawOval(centerX - radius, centerY - radius, radius * 2, radius * 2);
+
+                int rayInner = radius + 2;
+                int rayOuter = radius + 4;
+                for (int i = 0; i < 8; i++) {
+                    double angle = i * Math.PI / 4;
+                    int x1 = centerX + (int) (Math.cos(angle) * rayInner);
+                    int y1 = centerY + (int) (Math.sin(angle) * rayInner);
+                    int x2 = centerX + (int) (Math.cos(angle) * rayOuter);
+                    int y2 = centerY + (int) (Math.sin(angle) * rayOuter);
+                    g2.drawLine(x1, y1, x2, y2);
+                }
+                g2.dispose();
+            }
+            @Override public int getIconWidth() { return 24; }
+            @Override public int getIconHeight() { return 24; }
+        };
+    }
+
+    private static Icon createMoonIcon() {
+        return new Icon() {
+            @Override
+            public void paintIcon(Component c, Graphics g, int x, int y) {
+                Graphics2D g2 = (Graphics2D) g.create();
+                g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+                g2.setColor(c.getForeground());
+
+                int centerX = x + getIconWidth() / 2;
+                int centerY = y + getIconHeight() / 2;
+                int size = 12;
+
+                g2.fillOval(centerX - size/2, centerY - size/2, size, size);
+                g2.setColor(c.getBackground());
+                g2.fillOval(centerX - size/2 + 4, centerY - size/2 - 2, size, size);
+                g2.dispose();
+            }
+            @Override public int getIconWidth() { return 24; }
+            @Override public int getIconHeight() { return 24; }
+        };
+    }
+
+    private static Icon createHelpIcon() {
+        return new Icon() {
+            @Override
+            public void paintIcon(Component c, Graphics g, int x, int y) {
+                Graphics2D g2 = (Graphics2D) g.create();
+                g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+                g2.setColor(c.getForeground());
+
+                int centerX = x + getIconWidth() / 2;
+                int centerY = y + getIconHeight() / 2;
+                int size = 16;
+
+                g2.setStroke(new BasicStroke(1.5f));
+                g2.drawOval(centerX - size/2, centerY - size/2, size, size);
+
+                g2.setFont(new Font("SansSerif", Font.BOLD, 12));
+                FontMetrics fm = g2.getFontMetrics();
+                int textWidth = fm.stringWidth("?");
+                int textHeight = fm.getAscent();
+                g2.drawString("?", centerX - textWidth/2, centerY + textHeight/2 - 1);
+                g2.dispose();
+            }
+            @Override public int getIconWidth() { return 24; }
+            @Override public int getIconHeight() { return 24; }
+        };
     }
 }
