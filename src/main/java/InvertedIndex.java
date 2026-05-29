@@ -2,6 +2,9 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
+import com.google.gson.Gson;
+import java.io.FileReader;
+import java.io.FileWriter;
 
 public class InvertedIndex {
 
@@ -50,5 +53,18 @@ public class InvertedIndex {
 
     public int getSize() {
         return index.size();
+    }
+        public void saveToFile(String filePath) throws Exception {
+        Gson gson = new Gson();
+        try (FileWriter writer = new FileWriter(filePath)) {
+                gson.toJson(this, writer);
+        }
+    }
+
+        public static InvertedIndex loadFromFile(String filePath) throws Exception {
+        Gson gson = new Gson();
+        try (FileReader reader = new FileReader(filePath)) {
+            return gson.fromJson(reader, InvertedIndex.class);
+        }
     }
 }
