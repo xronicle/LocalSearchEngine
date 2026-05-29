@@ -63,44 +63,13 @@ public class Main {
             }
         }
 
-        Scanner scanner = new Scanner(System.in);
-        while (true) {
-            System.out.print("\nВведите запрос (или 'выход' для завершения): ");
-            String query = scanner.nextLine().toLowerCase().trim();
+        System.out.println("Запуск графического окна...");
 
-            if (query.equals("выход")) {
-                System.out.println("Поиск завершен.");
-                break;
-            }
+        final InvertedIndex finalEngineForGui = engine;
 
-            String[] queryWords = query.split("\\s+");
-            Map<String, Double> combinedResults = new HashMap<>();
-
-            for (String qWord : queryWords) {
-                if (qWord.isEmpty()) continue;
-
-                String stemmedQuery = RussianStemmer.stem(qWord);
-
-                Map<String, Double> wordResults = engine.searchTfIdf(stemmedQuery);
-
-                for (Map.Entry<String, Double> entry : wordResults.entrySet()) {
-                    String docName = entry.getKey();
-                    double score = entry.getValue();
-                    combinedResults.put(docName, combinedResults.getOrDefault(docName, 0.0) + score);
-                }
-            }
-
-            if (!combinedResults.isEmpty()) {
-                System.out.println("Результаты поиска (по суммарной TF-IDF релевантности):");
-
-                combinedResults.entrySet().stream()
-                        .sorted((e1, e2) -> e2.getValue().compareTo(e1.getValue()))
-                        .forEach(entry -> {
-                            System.out.printf(" %s (Суммарный вес: %.4f)\n", entry.getKey(), entry.getValue());
-                        });
-            } else {
-                System.out.println("По вашему запросу ничего не найдено.");
-            }
-        }
+        javax.swing.SwingUtilities.invokeLater(() -> {
+            SearchEngineGUI gui = new SearchEngineGUI(finalEngineForGui);
+            gui.setVisible(true);
+        });
     }
 }
