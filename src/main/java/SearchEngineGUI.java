@@ -28,7 +28,7 @@ public class SearchEngineGUI extends JFrame {
         engine = new InvertedIndex();
 
         setTitle("Локальная Поисковая Система");
-        setSize(850, 600);
+        setSize(950, 650);
         setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
         setLocationRelativeTo(null);
 
@@ -67,7 +67,7 @@ public class SearchEngineGUI extends JFrame {
 
         JPanel mainButtonPanel = new JPanel(new GridLayout(1, 2, 8, 0));
         JButton searchButton = new JButton("Найти");
-        JButton chooseFolderButton = new JButton("Обновить базу");
+        JButton chooseFolderButton = new JButton("Выбрать папку");
         mainButtonPanel.add(searchButton);
         mainButtonPanel.add(chooseFolderButton);
 
@@ -79,32 +79,33 @@ public class SearchEngineGUI extends JFrame {
 
         loadDatabaseIfExists();
 
-        tableModel = new DefaultTableModel(new String[]{"Документ", "Совпадений", "Вес (TF-IDF)", "Скрытый путь"}, 0) {
+        tableModel = new DefaultTableModel(new String[]{"Документ", "Цитата", "Совпадений", "Вес (TF-IDF)", "Скрытый путь"}, 0) {
             @Override
             public boolean isCellEditable(int row, int column) {
                 return false;
             }
             @Override
             public Class<?> getColumnClass(int columnIndex) {
-                if (columnIndex == 1) return Integer.class;
-                if (columnIndex == 2) return Double.class;
+                if (columnIndex == 2) return Integer.class;
+                if (columnIndex == 3) return Double.class;
                 return String.class;
             }
         };
 
         resultTable = new JTable(tableModel);
-        resultTable.setFont(new Font("SansSerif", Font.PLAIN, 14));
-        resultTable.setRowHeight(28);
+        resultTable.setFont(new Font("SansSerif", Font.PLAIN, 13));
+        resultTable.setRowHeight(50);
         resultTable.getTableHeader().setFont(new Font("SansSerif", Font.BOLD, 14));
         resultTable.setAutoCreateRowSorter(true);
 
-        resultTable.getColumnModel().getColumn(0).setPreferredWidth(500);
-        resultTable.getColumnModel().getColumn(1).setPreferredWidth(100);
-        resultTable.getColumnModel().getColumn(2).setPreferredWidth(120);
+        resultTable.getColumnModel().getColumn(0).setPreferredWidth(200);
+        resultTable.getColumnModel().getColumn(1).setPreferredWidth(400);
+        resultTable.getColumnModel().getColumn(2).setPreferredWidth(80);
+        resultTable.getColumnModel().getColumn(3).setPreferredWidth(100);
 
-        resultTable.getColumnModel().getColumn(3).setMinWidth(0);
-        resultTable.getColumnModel().getColumn(3).setMaxWidth(0);
-        resultTable.getColumnModel().getColumn(3).setWidth(0);
+        resultTable.getColumnModel().getColumn(4).setMinWidth(0);
+        resultTable.getColumnModel().getColumn(4).setMaxWidth(0);
+        resultTable.getColumnModel().getColumn(4).setWidth(0);
 
         JScrollPane scrollPane = new JScrollPane(resultTable);
         scrollPane.setBorder(BorderFactory.createEmptyBorder(0, 15, 15, 15));
@@ -165,7 +166,7 @@ public class SearchEngineGUI extends JFrame {
             currentFolderLabel.setText("Текущая база: " + selectedFolder.getAbsolutePath());
 
             tableModel.setRowCount(0);
-            tableModel.addRow(new Object[]{"Индексация...", 0, 0.0, ""});
+            tableModel.addRow(new Object[]{"Индексация...", "", 0, 0.0, ""});
 
             new Thread(() -> {
                 engine = new InvertedIndex();
@@ -173,7 +174,7 @@ public class SearchEngineGUI extends JFrame {
                     paths.filter(Files::isRegularFile)
                             .filter(p -> {
                                 String name = p.toString().toLowerCase();
-                                return !name.startsWith("~$") && (name.endsWith(".txt") || name.endsWith(".pdf") || name.endsWith(".docx"));
+                                return !name.startsWith("~$") && (name.endsWith(".txt") || name.endsWith(".pdf") || name.endsWith(".docx") || name.endsWith(".xlsx") || name.endsWith(".pptx"));
                             })
                             .forEach(filePath -> {
                                 try {
@@ -187,7 +188,6 @@ public class SearchEngineGUI extends JFrame {
                                         engine.addWord(RussianStemmer.stem(word), absolutePath);
                                     }
                                 } catch (Exception ex) {
-                                    System.out.println("Пропущен файл: " + filePath.getFileName());
                                 }
                             });
 
@@ -214,9 +214,12 @@ public class SearchEngineGUI extends JFrame {
         Map<String, Double> combinedTfIdf = new java.util.HashMap<>();
         Map<String, Integer> combinedFreq = new java.util.HashMap<>();
 
+        String firstStemmedWord = "";
+
         for (String qWord : queryWords) {
             if (qWord.isEmpty()) continue;
             String stemmedQuery = RussianStemmer.stem(qWord);
+            if (firstStemmedWord.isEmpty()) firstStemmedWord = stemmedQuery;
 
             Map<String, Double> tfIdfResults = engine.searchTfIdf(stemmedQuery);
             for (Map.Entry<String, Double> entry : tfIdfResults.entrySet()) {
@@ -234,7 +237,7 @@ public class SearchEngineGUI extends JFrame {
         tableModel.setRowCount(0);
 
         if (combinedTfIdf.isEmpty()) {
-            tableModel.addRow(new Object[]{"Ничего не найдено", 0, 0.0, ""});
+            tableModel.addRow(new Object[]{"Ничего не найдено", "", 0, 0.0, ""});
             return;
         }
 
@@ -246,11 +249,13 @@ public class SearchEngineGUI extends JFrame {
             double rawScore = combinedTfIdf.get(fullPath);
             double formattedScore = Math.round(rawScore * 10000.0) / 10000.0;
 
-            tableModel.addRow(new Object[]{fileName, freq, formattedScore, fullPath});
+            String snippet = SnippetGenerator.generateSnippet(fullPath, firstStemmedWord, freq);
+
+            tableModel.addRow(new Object[]{fileName, snippet, freq, formattedScore, fullPath});
         }
 
-        resultTable.getRowSorter().toggleSortOrder(2);
-        resultTable.getRowSorter().toggleSortOrder(2);
+        resultTable.getRowSorter().toggleSortOrder(3);
+        resultTable.getRowSorter().toggleSortOrder(3);
     }
 
     private void openSelectedFile() {
@@ -258,7 +263,7 @@ public class SearchEngineGUI extends JFrame {
         if (row == -1) return;
 
         int modelRow = resultTable.convertRowIndexToModel(row);
-        String absolutePath = (String) tableModel.getValueAt(modelRow, 3);
+        String absolutePath = (String) tableModel.getValueAt(modelRow, 4);
 
         if (absolutePath.isEmpty()) return;
 
